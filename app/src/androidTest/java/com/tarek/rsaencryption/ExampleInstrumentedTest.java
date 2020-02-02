@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.os.IBinder;
 import android.util.Base64;
 import android.util.Log;
@@ -76,7 +77,7 @@ public class ExampleInstrumentedTest {
 
     @Test
     public void genKeyPairReturnsSamePair() throws NoSuchAlgorithmException {
-        ks.reset();
+        ks.resetUserKeyPair();
         KeyPair first = ks.generateKeyPair();
         KeyPair second = ks.generateKeyPair();
         assertEquals(first.getPublic(), second.getPublic());
@@ -89,6 +90,15 @@ public class ExampleInstrumentedTest {
         String text = "ENCRYPT THIS";
         String encrypted = ks.encrypt(text, keyPair.getPrivate());
         assertEquals(text, ks.decrypt(encrypted, keyPair.getPublic()));
+    }
+
+    @Test
+    public void canStorePublicKey() throws NoSuchAlgorithmException {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        KeyPair keyPair = keyPairGenerator.generateKeyPair();
+        PublicKey publicKey = keyPair.getPublic();
+        ks.storePublicKey("USER", publicKey);
+        assertEquals(publicKey, ks.getUserPublicKey("USER"));
     }
 
 

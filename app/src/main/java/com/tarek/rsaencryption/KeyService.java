@@ -5,46 +5,21 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.IBinder;
-import android.renderscript.Float4;
-import android.security.KeyPairGeneratorSpec;
-import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyProperties;
 import android.util.Base64;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.security.InvalidKeyException;
-import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.Security;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAKeyGenParameterSpec;
-import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import com.google.gson.Gson;
 
 import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
 
 public class KeyService extends Service {
 
-    private Gson gson = new Gson();
     private final IBinder mBinder = new BinderInstance();
-    private final String ENCRYPTED_KEYS = "ENCRYPTED_KEYS";
     private final String SAVED_PUBLIC_KEYS = "SAVED_PUBLIC_KEYS";
     private final String USER_KEYPAIR = "USER_KEYPAIR";
     private final String PRIVATE_KEY = "PRIVATE_KEY";
@@ -72,6 +47,24 @@ public class KeyService extends Service {
         return 1;
     }
 
+    public void storePublicKey(String user, PublicKey publicKey) {
+        if(user == null)
+            return;
+        SharedPreferences sp = getSharedPreferences(SAVED_PUBLIC_KEYS, MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putString(user, Base64.encodeToString(publicKey.getEncoded(), Base64.DEFAULT));
+        editor.commit();
+    }
+
+    public PublicKey getUserPublicKey(String user) {
+        if(user == null)
+            return null;
+        SharedPreferences sp = getSharedPreferences(SAVED_PUBLIC_KEYS, MODE_PRIVATE);
+        if(sp.getString(user, null) == null)
+            return null;
+        return getPublicKey(sp.getString(user, null));
+    }
+
     public KeyPair generateKeyPair() throws NoSuchAlgorithmException {
         SharedPreferences sp = getSharedPreferences(USER_KEYPAIR, MODE_PRIVATE);
         KeyPair keyPair = null;
@@ -90,7 +83,17 @@ public class KeyService extends Service {
         return keyPair;
     }
 
-    public void reset(){
+    public void resetKey(String user){
+        if(user == null)
+            return;
+        SharedPreferences sp = getSharedPreferences(SAVED_PUBLIC_KEYS, MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        if(sp.getString(user, null) == null)
+            return;
+        editor.remove(user).commit();
+    }
+
+    public void resetUserKeyPair(){
         SharedPreferences sp = getSharedPreferences(USER_KEYPAIR, MODE_PRIVATE);
         SharedPreferences.Editor editor = sp.edit();
         editor.clear().commit();
