@@ -5,15 +5,30 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.IBinder;
+import android.renderscript.Float4;
+import android.security.KeyPairGeneratorSpec;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 import android.util.Base64;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Security;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAKeyGenParameterSpec;
+import java.security.spec.RSAPublicKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -30,9 +45,11 @@ public class KeyService extends Service {
     private Gson gson = new Gson();
     private final IBinder mBinder = new BinderInstance();
     private final String ENCRYPTED_KEYS = "ENCRYPTED_KEYS";
-    private final String SAVED_KEY_PAIR_VALUES = "SAVED_KEY_PAIR_VALUES";
+    private final String SAVED_PUBLIC_KEYS = "SAVED_PUBLIC_KEYS";
     private final String USER_KEYPAIR = "USER_KEYPAIR";
-    private Set<String> keyPairs = new HashSet<>();
+    private final String PRIVATE_KEY = "PRIVATE_KEY";
+    private final String PUBLIC_KEY = "PUBLIC_KEY";
+
     private Cipher cipher;
 
     public class BinderInstance extends Binder {
@@ -56,26 +73,59 @@ public class KeyService extends Service {
     }
 
     public KeyPair generateKeyPair() throws NoSuchAlgorithmException {
-        SharedPreferences sharedPreferences = getSharedPreferences(ENCRYPTED_KEYS, MODE_PRIVATE);
-        String userKeyPair = sharedPreferences.getString(USER_KEYPAIR, null);
-        KeyPair keyPair;
-        if(userKeyPair == null) {
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-            keyPair = keyPairGenerator.generateKeyPair();
-            SharedPreferences.Editor editor = sharedPreferences.edit();
-            editor.putString(USER_KEYPAIR, keyToJson(keyPair));
-            editor.apply();
+        SharedPreferences sp = getSharedPreferences(USER_KEYPAIR, MODE_PRIVATE);
+        KeyPair keyPair = null;
+        if(sp.getString(PUBLIC_KEY, null) == null || sp.getString(PRIVATE_KEY, null) == null){
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            keyPair = kpg.generateKeyPair();
+            SharedPreferences.Editor editor = sp.edit();
+            editor.putString(PUBLIC_KEY, Base64.encodeToString(keyPair.getPublic().getEncoded(), Base64.DEFAULT));
+            editor.putString(PRIVATE_KEY, Base64.encodeToString(keyPair.getPrivate().getEncoded(), Base64.DEFAULT));
+            editor.commit();
         } else {
-            keyPair = jsonToKey(userKeyPair);
+            String privateKey = sp.getString(PRIVATE_KEY, null);
+            String publicKey = sp.getString(PUBLIC_KEY, null);
+            keyPair = new KeyPair(getPublicKey(publicKey), getPrivateKey(privateKey));
         }
         return keyPair;
-
     }
 
-    public String encrypt(String text, KeyPair userKey) {
+    public void reset(){
+        SharedPreferences sp = getSharedPreferences(USER_KEYPAIR, MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.clear().commit();
+    }
+
+
+    private PublicKey getPublicKey(String str) {
+        byte[] decoded = Base64.decode(str, Base64.DEFAULT);
+        X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(decoded);
+        try {
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePublic(x509EncodedKeySpec);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private PrivateKey getPrivateKey(String str){
+        byte[] decoded = Base64.decode(str, Base64.DEFAULT);
+        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(decoded);
+        try {
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePrivate(pkcs8EncodedKeySpec);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    public String encrypt(String text, PrivateKey userPrivateKey) {
         String returned = null;
         try {
-            cipher.init(Cipher.ENCRYPT_MODE, userKey.getPrivate());
+            cipher.init(Cipher.ENCRYPT_MODE, userPrivateKey);
             byte[] encryptedText = cipher.doFinal(text.getBytes());
             returned = Base64.encodeToString(encryptedText, Base64.DEFAULT);
         } catch (Exception e){
@@ -96,12 +146,5 @@ public class KeyService extends Service {
         return decoded;
     }
 
-    private String keyToJson(KeyPair keyPair){
-        return gson.toJson(keyPair);
-    }
-
-    private KeyPair jsonToKey(String jsonString) {
-        return gson.fromJson(jsonString, KeyPair.class);
-    }
 
 }
