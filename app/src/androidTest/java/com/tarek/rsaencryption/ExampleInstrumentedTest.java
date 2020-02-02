@@ -17,6 +17,8 @@ import org.junit.Test;
 
 import org.junit.runner.RunWith;
 
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.*;
@@ -35,6 +37,7 @@ public class ExampleInstrumentedTest {
 
     Context appContext;
     KeyService ks;
+    KeyPair userKeyPair;
 
 
     @Before
@@ -53,6 +56,18 @@ public class ExampleInstrumentedTest {
     public void canCommunicateWithService() {
         assertEquals("This method should return 1 from the service.", 1, ks.getNumber());
     }
+
+    @Test
+    public void generateKeyPairReturnsKeyPair() throws NoSuchAlgorithmException {
+        userKeyPair = ks.generateKeyPair();
+        assertNotNull(userKeyPair);
+    }
+
+    @Test
+    public void keyPairCanDecrypt() {
+
+    }
+
 
 
 
