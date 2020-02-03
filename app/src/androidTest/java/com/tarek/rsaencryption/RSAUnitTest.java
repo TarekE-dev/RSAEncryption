@@ -1,36 +1,23 @@
 package com.tarek.rsaencryption;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
-import android.content.SharedPreferences;
 import android.os.IBinder;
-import android.util.Base64;
-import android.util.Log;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.rule.ServiceTestRule;
 
-import org.checkerframework.checker.units.qual.K;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
 import org.junit.runner.RunWith;
 
-import java.security.InvalidKeyException;
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.*;
@@ -41,7 +28,7 @@ import static org.junit.Assert.*;
  * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
  */
 @RunWith(AndroidJUnit4.class)
-public class ExampleInstrumentedTest {
+public class RSAUnitTest {
 
 
     @Rule
@@ -99,6 +86,24 @@ public class ExampleInstrumentedTest {
         PublicKey publicKey = keyPair.getPublic();
         ks.storePublicKey("USER", publicKey);
         assertEquals(publicKey, ks.getUserPublicKey("USER"));
+    }
+
+    @Test
+    public void resetsRemovesUserKey() throws NoSuchAlgorithmException {
+        KeyPair first = ks.generateKeyPair();
+        ks.resetUserKeyPair();
+        KeyPair second = ks.generateKeyPair();
+        assertNotEquals("These should be different key pairs", first, second);
+    }
+
+    @Test
+    public void removePartnetKeyWorks() throws NoSuchAlgorithmException {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        KeyPair keyPair = kpg.generateKeyPair();
+        PublicKey publicKey = keyPair.getPublic();
+        ks.storePublicKey("USER_NEW", publicKey);
+        ks.resetKey("USER_NEW");
+        assertNull(ks.getUserPublicKey("USER_NEW"));
     }
 
 
